@@ -2,56 +2,61 @@
 // Created by XingfengYang on 2020/7/17.
 //
 
-#include <log.h>
-#include <mutex.h>
-#include <stdbool.h>
-#include <thread.h>
+#include "kernel/mutex.h"
+#include "arm/register.h"
+#include "kernel/assert.h"
+#include "kernel/kqueue.h"
+#include "kernel/percpu.h"
+#include "kernel/scheduler.h"
+#include "kernel/thread.h"
 
-extern Thread *currentThread;
-extern KernelStatus schd_switch_next();
-extern KernelStatus schd_add_to_schduler(Thread *thread);
-extern KernelStatus schd_remove_from_schduler(Thread *thread);
+extern Scheduler cfsScheduler;
 
-void mutex_create(Mutex *mutex, Atomic *atomic) {
-  mutex->val = atomic;
-  mutex->waitQueue = nullptr;
-  atomic_create(atomic);
+void mutex_default_acquire(Mutex *mutex) {
+    mutex->spinLock.operations.acquire(&mutex->spinLock);
+
+    if (atomic_get(&mutex->val) == 0) {
+        atomic_set(&mutex->val, 1);
+    } else {
+        uint32_t cpuid = read_cpuid();
+        PerCpu *perCpu = percpu_get(cpuid);
+        Thread *currentThread = perCpu->currentThread;
+
+        DEBUG_ASSERT(currentThread != nullptr);
+
+        // can not get the lock, just add to lock wait list
+        mutex->waitQueue.operations.enqueue(&mutex->waitQueue, &currentThread->threadReadyQueue);
+        currentThread->threadStatus = THREAD_BLOCKED;
+        // remove from schd list
+        perCpu->rbTree.operations.remove(&perCpu->rbTree, &currentThread->rbNode);
+        // 2. switch to the next thread in scheduler
+
+        cfsScheduler.operation.switchNext(&cfsScheduler);
+    }
+
+    mutex->spinLock.operations.release(&mutex->spinLock);
 }
 
-bool mutex_acquire(Mutex *mutex) {
-  if (atomic_get(mutex->val) == 0) {
-    atomic_set(mutex->val, 1);
-    return true;
-  } else {
-    // can not get the lock, just add to lock wait list
-    KernelStatus enQueueStatus = kqueue_enqueue(mutex->waitQueue, &currentThread->threadReadyQueue);
-    if (enQueueStatus != OK) {
-      LogError("[Mutex]: thread add to wait list failed. \n");
-      return false;
+void mutex_default_release(Mutex *mutex) {
+    mutex->spinLock.operations.acquire(&mutex->spinLock);
+
+    if (atomic_get(&mutex->val) == 0) {
+        return;
+    } else {
+        KQueueNode *node = mutex->waitQueue.operations.dequeue(&mutex->waitQueue);
+
+        uint32_t cpuid = read_cpuid();
+        PerCpu *perCpu = percpu_get(cpuid);
+        Thread *currentThread = getNode(node, Thread, threadReadyQueue);
+
+        DEBUG_ASSERT(currentThread != nullptr);
+
+        perCpu->rbTree.operations.insert(&perCpu->rbTree, &currentThread->rbNode);
+        currentThread->threadStatus = THREAD_READY;
+        atomic_set(&mutex->val, 0);
+
+        // TODO: maybe should consider virtual runtime.
     }
 
-    // reomve from schd list
-    KernelStatus removeStatus = schd_remove_from_schduler(currentThread);
-    if (removeStatus != OK) {
-      LogError("[Mutex]: thread remove from schd list failed. \n");
-      return false;
-    }
-
-    // 2. switch to the next thread in scheduler
-    KernelStatus thradSwitchNextStatus = schd_switch_next();
-    if (thradSwitchNextStatus != OK) {
-      LogError("[Mutex]: thread switch to next failed. \n");
-    }
-    return false;
-  }
-}
-
-void mutex_release(Mutex *mutex) {
-  atomic_set(mutex->val, 0);
-  KQueue *queueNode = kqueue_dequeue(mutex->waitQueue);
-  Thread *releasedThread = getNode(queueNode, Thread, threadReadyQueue);
-  KernelStatus addToSchduler = schd_add_to_schduler(releasedThread);
-  if (addToSchduler != OK) {
-    LogError("[Mutex]: thread add to schduler failed. \n");
-  }
+    mutex->spinLock.operations.release(&mutex->spinLock);
 }

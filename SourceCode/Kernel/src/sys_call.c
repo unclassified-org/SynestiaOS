@@ -1,66 +1,65 @@
 //
-// Created by XingfengYang on 2020/7/13.
+// Created by XingfengYang on 2020/7/17.
 //
+#include <raspi2/uart.h>
+#include "kernel/sys_call.h"
+#include "kernel/scheduler.h"
+#include "kernel/vfs.h"
 
-#include <log.h>
-#include <sys_call.h>
+extern VFS vfs;
+extern Scheduler cfsScheduler;
 
-int sys_setup(void) {
-  LogWarnning("[SysCall] syscall setup invoked.\n");
-  return 0;
+uint32_t sys_restart_syscall() { return 0; }
+
+uint32_t sys_exit(int error_code) { return 0; }
+
+uint32_t sys_fork() { return 0; }
+
+uint32_t sys_read(uint32_t fd, char *buf, uint32_t count) {
+    if (fd == FD_STDIN) {
+        do_uart_get_char();
+    } else if (fd == FD_STDOUT) {
+        
+    } else if (fd == FD_STDERR) {
+
+    } else {
+        return vfs.operations.read(&vfs, fd, buf, 0, count);
+    }
 }
 
-int sys_exit(void) {
-  LogWarnning("[SysCall] syscall exit invoked.\n");
-  return 0;
+uint32_t sys_write(uint32_t fd, const char *buf, uint32_t count) {
+    if (fd == FD_STDIN) {
+
+    } else if (fd == FD_STDOUT) {
+        uart_print(buf);
+    } else if (fd == FD_STDERR) {
+
+    } else {
+        return vfs.operations.write(&vfs, fd, buf, 0, count);
+    }
 }
 
-int sys_fork(void) {
-  LogWarnning("[SysCall] syscall fork invoked.\n");
-  return 0;
+uint32_t sys_open(const char *filename, int flags, uint32_t mode) { return vfs.operations.open(&vfs, filename, mode); }
+
+uint32_t sys_close(uint32_t fd) { return vfs.operations.close(&vfs, fd); }
+
+uint32_t sys_execve(const char *filename, const char *argv, const char *envp) {
 }
 
-int sys_read(void) {
-  LogWarnning("[SysCall] syscall read invoked.\n");
-  return 0;
-}
+uint32_t sys_chdir(const char *filename) { return 0; }
 
-int sys_write(void) {
-  LogWarnning("[SysCall] syscall write invoked.\n");
-  return 0;
-}
+uint32_t sys_time(uint32_t *tloc) { return 0; }
 
-int sys_test1(int arg1){
-  LogWarnning("[SysCall] syscall test1 invoked. arg1: %d \n",arg1);
-  return 0;
-}
+uint32_t sys_getpid() { return cfsScheduler.operation.getCurrentPid(&cfsScheduler); }
 
-int sys_test2(int arg1,int arg2){
-  LogWarnning("[SysCall] syscall test2 invoked. arg1: %d \n",arg1);
-  LogWarnning("[SysCall] syscall test2 invoked. arg2: %d \n",arg2);
-  return 0;
-}
+uint32_t sys_mount(char *dev_name, char *dir_name, char *type, unsigned long flags, void *data) { return 0; }
 
-int sys_test3(int arg1,int arg2,int arg3){
-  LogWarnning("[SysCall] syscall test3 invoked. arg1: %d \n",arg1);
-  LogWarnning("[SysCall] syscall test3 invoked. arg2: %d \n",arg2);
-  LogWarnning("[SysCall] syscall test3 invoked. arg3: %d \n",arg3);
-  return 0;
-}
+uint32_t sys_umount(char *name, int flags) { return 0; }
 
-int sys_test4(int arg1,int arg2,int arg3,int arg4){
-  LogWarnning("[SysCall] syscall test4 invoked. arg1: %d \n",arg1);
-  LogWarnning("[SysCall] syscall test4 invoked. arg2: %d \n",arg2);
-  LogWarnning("[SysCall] syscall test4 invoked. arg3: %d \n",arg3);
-  LogWarnning("[SysCall] syscall test4 invoked. arg4: %d \n",arg4);
-  return 0;
-}
+uint32_t sys_kill(uint32_t pid, int sig) { return 0; }
 
-int sys_test5(int arg1,int arg2,int arg3,int arg4,int arg5){
-  LogWarnning("[SysCall] syscall test5 invoked. arg1: %d \n",arg1);
-  LogWarnning("[SysCall] syscall test5 invoked. arg2: %d \n",arg2);
-  LogWarnning("[SysCall] syscall test5 invoked. arg3: %d \n",arg3);
-  LogWarnning("[SysCall] syscall test5 invoked. arg4: %d \n",arg4);
-  LogWarnning("[SysCall] syscall test5 invoked. arg5: %d \n",arg5);
-  return 0;
-}
+uint32_t sys_rename(const char *oldname, const char *newname) { return 0; }
+
+uint32_t sys_mkdir(const char *pathname, uint32_t mode) { return 0; }
+
+uint32_t sys_rmdir(const char *pathname) { return 0; }

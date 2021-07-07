@@ -1,48 +1,56 @@
-PROJECT(Tests C ASM)
+PROJECT(KernelUnitTests C ASM)
 
-set(TestsTempDir ${CMAKE_BINARY_DIR}/TempDir)
-set(TestsKernelArchTempDir ${TestsTempDir}/Arch/${SynestiaArch})
-set(BootSourceCodeOnlyForTests ${TestsKernelArchTempDir}/boot.s)
+set(KernelArchDir ${SynestiaOS_SOURCE_DIR}/SourceCode/Arch/${SynestiaArch})
 
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/TempDir)
-file(COPY ${SynestiaOS_SOURCE_DIR}/SourceCode/Kernel/Arch DESTINATION ${TestsTempDir})
-file(READ ${BootSourceCodeOnlyForTests} BootSourceCode)
-# replace kernel_main to kernel_main_tests
-string(REPLACE kernel_main
-        kernel_main_tests KernelMainTests
-        ${BootSourceCode})
-file(WRITE ${BootSourceCodeOnlyForTests} ${KernelMainTests})
+find_asm_source_files(ASM_SOURCE_FILES ${KernelArchDir}/src)
+aux_source_directory(${KernelUnitTests_SOURCE_DIR}/src KernelUnitTestsSrc)
+aux_source_directory(${KernelArchDir}/src KernelArchSrc)
 
-aux_source_directory(${TestsKernelArchTempDir} KernelArchOnlyForTestsSrc)
-aux_source_directory(${TestsKernelArchTempDir}/vmm/src KernelArchOnlyForTestsVMMSrc)
-
-add_library(KernelArchOnlyForTests
+# todo: refactor, move the library definition to Arch dir
+set(KernelArchUnitTests KernelArchUnitTests)
+add_library(${KernelArchUnitTests}
         OBJECT
-        ${KernelArchOnlyForTestsSrc}
-        ${KernelArchOnlyForTestsVMMSrc}
-        ${BootSourceCodeOnlyForTests})
+        ${KernelArchSrc}
+        ${ASM_SOURCE_FILES})
+target_compile_definitions(${KernelArchUnitTests} PRIVATE "-DENV_KERNEL_UNIT_TESTS")
 
-target_include_vmm_header_files(KernelArchOnlyForTests)
-target_include_kernel_header_files(KernelArchOnlyForTests)
-target_include_libc_header_files(KernelArchOnlyForTests)
+target_include_arch_header_files(${KernelArchUnitTests})
+target_include_kernel_header_files(${KernelArchUnitTests})
+target_include_libc_header_files(${KernelArchUnitTests})
+target_include_libmath_header_files(${KernelArchUnitTests})
 
-aux_source_directory(${Tests_SOURCE_DIR}/src TestsSrc)
-add_executable(${PROJECT_NAME}
-        ${TestsSrc}
-        $<TARGET_OBJECTS:KernelArchOnlyForTests>
+if (SynestiaPlatform STREQUAL pi2)
+    set(boardObj BoardRaspberryPi)
+elseif (SynestiaPlatform STREQUAL pi3)
+    set(boardObj BoardRaspberryPi)
+elseif (SynestiaPlatform STREQUAL pi4)
+    set(boardObj BoardRaspberryPi)
+else ()
+    message(ERROR "unexpected PLATFORM ${PLATFORM}")
+endif ()
+
+set(KernelUnitTestsImg KernelUnitTests.elf)
+add_executable(${KernelUnitTestsImg}
+        ${KernelUnitTestsSrc}
+        $<TARGET_OBJECTS:${KernelArchUnitTests}>
         $<TARGET_OBJECTS:Kernel>
-        $<TARGET_OBJECTS:BoardRaspberryPi3>
+        $<TARGET_OBJECTS:LibC>
+        $<TARGET_OBJECTS:LibElf>
+        $<TARGET_OBJECTS:LibMath>
         $<TARGET_OBJECTS:LibGfx>
         $<TARGET_OBJECTS:LibGUI>
-        $<TARGET_OBJECTS:LibMath>
-        $<TARGET_OBJECTS:LibC>)
+        $<TARGET_OBJECTS:${boardObj}>)
 
-target_include_tests_header_files(${PROJECT_NAME})
-target_include_libc_header_files(${PROJECT_NAME})
-target_include_raspberry_pi3_header_files(${PROJECT_NAME})
-target_include_kernel_header_files(${PROJECT_NAME})
-target_include_vmm_header_files(${PROJECT_NAME})
+target_sources(${KernelUnitTestsImg}
+        PRIVATE
+        ${SYNESTIAOS_FS_DIR}/initrd.o)
 
-target_link_options(${PROJECT_NAME} PRIVATE -T ${TestsKernelArchTempDir}/kernel.ld)
+target_include_tests_header_files(${KernelUnitTestsImg})
+target_include_libc_header_files(${KernelUnitTestsImg})
+target_include_arch_header_files(${KernelUnitTestsImg})
+target_include_raspberry_pi_header_files(${KernelUnitTestsImg})
+target_include_kernel_header_files(${KernelUnitTestsImg})
+target_include_libmath_header_files(${KernelUnitTestsImg})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE gcc)
+target_link_options(${KernelUnitTestsImg} PRIVATE -T ${KernelArchDir}/src/kernel.ld)
+target_link_libraries(${KernelUnitTestsImg} PRIVATE gcc)

@@ -1,10 +1,7 @@
 .idea/
-Tools/
-*.o
-*.ao
-Kernel/kernel
-Tests/integrate_test
-Tests/os_test
-Tests/tools
-/cmake-build-debug/
+.DS_Store
+cmake-build-debug/
 Build/
+SourceCode/Board/MaixGo/
+devlog/
+Scripts/build*

@@ -1,1 +1,1 @@
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/RaspberryPi3)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/RaspberryPi)

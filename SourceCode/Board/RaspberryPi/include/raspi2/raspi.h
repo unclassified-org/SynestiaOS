@@ -1,0 +1,19 @@
+#ifndef __BOARD_RASP_H__
+#define __BOARD_RASP_H__
+
+#if defined(RASPI_Z_W)
+#define PERIPHERAL_BASE 0x20000000
+#elif defined(RASPI2)
+#define PERIPHERAL_BASE 0x3F000000
+#elif defined(RASPI3)
+#define PERIPHERAL_BASE 0x3F000000
+#elif defined(RASPI4)
+#define PERIPHERAL_BASE 0xFE000000
+#endif
+
+#define INTERRUPTS_OFFSET 0xB000
+#define MAILBOX_OFFSET 0xB880
+#define UART0_OFFSET 0x201000
+#define GPIO_OFFSET 0x200000
+
+#endif// __BOARD_RASP_H__
